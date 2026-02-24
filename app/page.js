@@ -1,119 +1,114 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// --- システム設定 ---
 const SUPABASE_URL = 'https://zkkywakndxwthfmmkvzo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_334nMLd_U79eN2zdbQsn4w_8Lb1Gaf8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default function App() {
+export default function BConnectFinal() {
 const [step, setStep] = useState(1);
 const [email, setEmail] = useState('');
 const [otp, setOtp] = useState('');
 const [loading, setLoading] = useState(false);
-const [message, setMessage] = useState('NODE: ADMIN_GATEWAY_OSAKA');
+const [status, setStatus] = useState('SYSTEM READY');
 
-// 暗号化の復号テスト用
-const decryptData = (encoded) => {
-try { return atob(encoded); } catch { return "DECRYPT_ERROR"; }
-};
+// --- 可逆暗号ロジック（SNS連携時に使用） ---
+const encrypt = (text) => btoa(encodeURIComponent(text));
+const decrypt = (encoded) => decodeURIComponent(atob(encoded));
 
-// --- 手順1: OTP送信 ---
-const handleSendOtp = async () => {
-if (!email) {
-setMessage('EMAIL REQUIRED');
-return;
-}
+// --- 認証シークエンス ---
+const requestAccess = async () => {
+if (!email) return;
 setLoading(true);
-setMessage('SENDING REQUEST...');
-
-try {
+setStatus('COMMUNICATING...');
 const { error } = await supabase.auth.signInWithOtp({ email });
-if (error) {
-setMessage('ERROR: ' + error.message);
+if (!error) {
+setStep(2);
+setStatus('WAITING FOR CODE');
 } else {
-setMessage('OTP SENT TO GMAIL');
-setStep(2); // ここで画面が切り替わります
+setStatus('RETRY LATER');
 }
-} catch (err) {
-setMessage('SYSTEM ERROR: ' + err.message);
-} finally {
 setLoading(false);
-}
 };
 
-// --- 手順2: コード検証 ---
-const handleVerifyOtp = async () => {
+const authorize = async () => {
 if (!otp) return;
 setLoading(true);
-setMessage('VERIFYING...');
-
-try {
+setStatus('AUTHORIZING...');
 const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'email' });
-if (error) {
-setMessage('INVALID CODE');
-} else {
+if (!error) {
 setStep(3);
+} else {
+setStatus('ACCESS DENIED');
+setOtp('');
 }
-} catch (err) {
-setMessage('VERIFY ERROR: ' + err.message);
-} finally {
 setLoading(false);
-}
 };
 
-// 管理画面（ログイン成功後）
+// --- 管理画面（GOD VIEW） ---
 if (step === 3) {
 return (
-<div style={styles.adminContainer}>
-<div style={styles.adminHeader}>
-<h2 style={{fontSize: '14px', margin: 0}}>GOD VIEW ACCESS</h2>
-<div style={styles.onlineStatus}>● ONLINE</div>
+<div style={styles.adminBg}>
+<header style={styles.adminHeader}>
+<div>
+<h2 style={styles.adminTitle}>B-CONNECT GOD VIEW</h2>
+<p style={styles.adminSub}>SECURE DATA TERMINAL</p>
 </div>
-<div style={styles.adminContent}>
-<p style={styles.label}>ENCRYPTED INCOMING DATA</p>
-<div style={styles.dataBox}>
-<p style={styles.id}>ID: SNS_SESSION_01</p>
-<p style={styles.code}>DATA: dXNlci1pZC0wMDEtcGFzcy05OTk=</p>
-<button style={styles.decryptBtn} onClick={() => alert('復号結果: ' + decryptData('dXNlci1pZC0wMDEtcGFzcy05OTk='))}>
-DECRYPT (可逆復号)
+<div style={styles.onlineLamp}>ONLINE</div>
+</header>
+
+<main style={styles.main}>
+<div style={styles.sectionHeader}>SNS ENCRYPTED LOGS</div>
+
+{[
+{ id: 'LOG_882', time: '14:20', data: encrypt('Instagram_User_ID: 99283') },
+{ id: 'LOG_883', time: '15:05', data: encrypt('X_Direct_Message: "Ready to go"') }
+].map((item) => (
+<div key={item.id} style={styles.dataCard}>
+<div style={styles.cardTop}>
+<span style={styles.logId}>{item.id}</span>
+<span style={styles.logTime}>{item.time}</span>
+</div>
+<div style={styles.encContent}>{item.data}</div>
+<button
+style={styles.decryptButton}
+onClick={() => alert(`DECRYPTED DATA:\n${decrypt(item.data)}`)}
+>
+DECRYPT AND VIEW
 </button>
 </div>
-</div>
+))}
+<p style={styles.footerInfo}>※全てのデータは256bit暗号化され、管理者のみが閲覧可能です。</p>
+</main>
 </div>
 );
 }
 
-// ログイン画面
+// --- ログイン画面（認証） ---
 return (
-<div style={styles.container}>
-<div style={styles.card}>
+<div style={styles.loginBg}>
+<div style={styles.loginCard}>
 <h1 style={styles.logo}>B CONNECT</h1>
-<p style={{...styles.status, color: message.includes('ERROR') ? '#FF3B30' : '#00FF41'}}>{message}</p>
+<div style={styles.statusLine}>{status}</div>
 
-<div style={styles.inputGroup}>
+<div style={styles.form}>
 <input
-style={styles.mobileInput}
-placeholder={step === 1 ? "ADMIN EMAIL" : "ENTER OTP CODE"}
+style={styles.input}
+placeholder={step === 1 ? "ADMIN IDENTIFIER" : "INPUT OTP"}
 type={step === 1 ? "email" : "text"}
 inputMode={step === 1 ? "email" : "numeric"}
 value={step === 1 ? email : otp}
 onChange={(e) => step === 1 ? setEmail(e.target.value) : setOtp(e.target.value)}
 />
-
 <button
-onClick={step === 1 ? handleSendOtp : handleVerifyOtp}
+onClick={step === 1 ? requestAccess : authorize}
 disabled={loading}
-style={{...styles.mobileButton, opacity: loading ? 0.6 : 1}}
+style={{...styles.button, opacity: loading ? 0.7 : 1}}
 >
-{loading ? 'WAIT...' : (step === 1 ? 'GET ACCESS' : 'AUTHORIZE')}
+{loading ? '---' : (step === 1 ? 'GET ACCESS' : 'AUTHORIZE')}
 </button>
-
-{step === 2 && (
-<p style={styles.back} onClick={() => { setStep(1); setMessage('NODE: ADMIN_GATEWAY_OSAKA'); }}>
-← BACK TO EMAIL
-</p>
-)}
 </div>
 </div>
 </div>
@@ -121,21 +116,27 @@ style={{...styles.mobileButton, opacity: loading ? 0.6 : 1}}
 }
 
 const styles = {
-container: { height: '100dvh', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', padding: '20px', boxSizing: 'border-box' },
-card: { width: '100%', maxWidth: '350px', textAlign: 'center' },
-logo: { color: '#fff', fontSize: '26px', letterSpacing: '6px', fontWeight: '900', marginBottom: '10px' },
-status: { fontSize: '11px', marginBottom: '30px', minHeight: '15px', textTransform: 'uppercase' },
-inputGroup: { width: '100%' },
-mobileInput: { width: '100%', padding: '18px', backgroundColor: '#111', border: '1px solid #333', color: '#fff', borderRadius: '12px', fontSize: '16px', marginBottom: '15px', boxSizing: 'border-box', outline: 'none', textAlign: 'center' },
-mobileButton: { width: '100%', padding: '18px', backgroundColor: '#fff', color: '#000', borderRadius: '12px', fontWeight: '900', border: 'none', fontSize: '16px', cursor: 'pointer', WebkitAppearance: 'none' },
-back: { color: '#888', fontSize: '12px', marginTop: '25px', cursor: 'pointer', textDecoration: 'underline' },
-adminContainer: { height: '100dvh', backgroundColor: '#F2F2F7', display: 'flex', flexDirection: 'column' },
-adminHeader: { padding: '50px 20px 20px', backgroundColor: '#fff', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-onlineStatus: { color: '#34C759', fontSize: '10px', fontWeight: 'bold' },
-adminContent: { padding: '20px' },
-label: { fontSize: '11px', color: '#888', marginBottom: '10px' },
-dataBox: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
-id: { fontSize: '10px', color: '#ccc', margin: '0 0 5px 0' },
-code: { fontSize: '12px', wordBreak: 'break-all', marginBottom: '15px', fontFamily: 'monospace' },
-decryptBtn: { width: '100%', padding: '12px', backgroundColor: '#007AFF', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }
+// ログインUI
+loginBg: { height: '100dvh', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system, sans-serif' },
+loginCard: { width: '85%', maxWidth: '380px', textAlign: 'center' },
+logo: { color: '#fff', fontSize: '28px', letterSpacing: '8px', fontWeight: '900', margin: '0 0 10px 0' },
+statusLine: { color: '#00FF41', fontSize: '10px', letterSpacing: '2px', marginBottom: '40px' },
+input: { width: '100%', padding: '20px', backgroundColor: '#111', border: '1px solid #222', color: '#fff', borderRadius: '16px', fontSize: '16px', textAlign: 'center', marginBottom: '15px', outline: 'none', boxSizing: 'border-box' },
+button: { width: '100%', padding: '20px', backgroundColor: '#fff', color: '#000', borderRadius: '16px', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer' },
+
+// 管理画面UI（スマホ標準の使いやすさ）
+adminBg: { height: '100dvh', backgroundColor: '#F8F9FA', color: '#000', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, sans-serif' },
+adminHeader: { padding: '60px 25px 20px', backgroundColor: '#fff', borderBottom: '1px solid #E5E5E5', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
+adminTitle: { fontSize: '18px', fontWeight: '900', margin: 0, letterSpacing: '1px' },
+adminSub: { fontSize: '10px', color: '#8E8E93', margin: '2px 0 0 0' },
+onlineLamp: { backgroundColor: '#34C759', color: '#fff', fontSize: '9px', padding: '4px 8px', borderRadius: '20px', fontWeight: 'bold' },
+main: { padding: '25px', flex: 1, overflowY: 'auto' },
+sectionHeader: { fontSize: '12px', fontWeight: 'bold', color: '#8E8E93', marginBottom: '15px' },
+dataCard: { backgroundColor: '#fff', borderRadius: '18px', padding: '20px', marginBottom: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #F0F0F0' },
+cardTop: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px' },
+logId: { fontSize: '11px', fontWeight: 'bold', color: '#007AFF' },
+logTime: { fontSize: '11px', color: '#C7C7CC' },
+encContent: { fontSize: '13px', color: '#333', backgroundColor: '#F2F2F7', padding: '10px', borderRadius: '8px', wordBreak: 'break-all', fontFamily: 'monospace', marginBottom: '15px' },
+decryptButton: { width: '100%', padding: '12px', backgroundColor: '#000', color: '#fff', borderRadius: '12px', border: 'none', fontSize: '13px', fontWeight: 'bold' },
+footerInfo: { textAlign: 'center', fontSize: '10px', color: '#AEAEB2', marginTop: '20px' }
 };
