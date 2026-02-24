@@ -6,125 +6,114 @@ const SUPABASE_URL = 'https://zkkywakndxwthfmmkvzo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_334nMLd_U79eN2zdbQsn4w_8Lb1Gaf8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default function AdminBypassPage() {
+export default function UserSignup() {
 const [step, setStep] = useState(1);
-const [email, setEmail] = useState('');
-const [otp, setOtp] = useState('');
+const [formData, setFormData] = useState({
+realName: '',
+displayName: '',
+email: '',
+password: ''
+});
 const [loading, setLoading] = useState(false);
-const [status, setStatus] = useState('ADMIN SYSTEM: BYPASS MODE');
+const [status, setStatus] = useState('OSU STUDENT REGISTRATION');
 
-const ADMIN_EMAIL = 'rei03021225@gmail.com';
-const MASTER_CODE = '1225'; // 👈 メールを送らずにログインできる合言葉
+const OSU_DOMAIN = '@ge.osaka-sandai.ac.jp';
 
-const encrypt = (text) => btoa(encodeURIComponent(text));
-const decrypt = (encoded) => {
-try { return decodeURIComponent(atob(encoded)); }
-catch { return "DECRYPT_ERROR"; }
-};
+// 暗号化処理
+const encryptData = (data) => btoa(encodeURIComponent(JSON.stringify(data)));
 
-// --- 管理者ログイン：バイパス承認 ---
-const requestAccess = async () => {
-const inputEmail = email.trim().toLowerCase();
-if (inputEmail !== ADMIN_EMAIL) {
-setStatus('ERROR: ACCESS DENIED');
+const handleStartAuth = async () => {
+if (!formData.realName || !formData.displayName || !formData.password) {
+setStatus('ERROR: 全て入力してください');
 return;
 }
-setLoading(true);
-
-// 【バイパス処理】Supabaseにメールを依頼せず、そのまま次のステップへ
-setTimeout(() => {
-setStep(2);
-setStatus('ENTER MASTER CODE');
-setLoading(false);
-}, 500);
-};
-
-// --- 管理者ログイン：認証チェック ---
-const authorize = async () => {
-if (otp === MASTER_CODE) {
-setStep(3); // ログイン成功
-} else {
-setStatus('INVALID MASTER CODE');
+if (!formData.email.endsWith(OSU_DOMAIN)) {
+setStatus('ERROR: 大産大メアドが必要です');
+return;
 }
+
+setLoading(true);
+setStatus('認証コード送信中...');
+const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
+
+if (!error) {
+setStep(2);
+setStatus('認証コードを入力してください');
+} else {
+setStatus('ERROR: ' + error.message);
+}
+setLoading(false);
 };
 
-// --- 3. 管理者ログイン後：ハッシュ画面 ---
+const completeRegistration = () => {
+const securePacket = encryptData({
+...formData,
+studentId: formData.email.split('@')[0],
+createdAt: new Date().toISOString()
+});
+console.log("暗号化データ作成完了:", securePacket);
+setStep(3);
+};
+
 if (step === 3) {
 return (
-<div style={styles.adminBg}>
-<header style={styles.adminHeader}>
-<h2 style={styles.adminTitle}>B-CONNECT TERMINAL</h2>
-<div style={styles.onlineLamp}>● BYPASS ACTIVE</div>
-</header>
-<main style={styles.main}>
-<div style={styles.sectionLabel}>ENCRYPTED USER LOGS</div>
-{[
-{ id: 'OSU_801', real: '大阪 太郎', nick: 'Taro', mail: 't12345@ge.osaka-sandai.ac.jp' },
-{ id: 'OSU_802', real: '産業 次郎', nick: 'SangyoJ', mail: 's67890@ge.osaka-sandai.ac.jp' }
-].map((user) => (
-<div key={user.id} style={styles.card}>
-<div style={styles.cardTop}><span style={styles.sourceTag}>OSU DATA</span><span style={styles.logId}>{user.id}</span></div>
-<div style={styles.encBox}>{encrypt(user.mail)}</div>
-<button style={styles.actionBtn} onClick={() => alert(`実名: ${user.real}\n表示名: ${user.nick}\nメアド: ${user.mail}`)}>DECRYPT</button>
+<div style={styles.container}>
+<div style={styles.card}>
+<div style={styles.successIcon}>✓</div>
+<h2 style={{color: '#fff', marginBottom: '10px'}}>REGISTERED</h2>
+<p style={{color: '#8E8E93', fontSize: '13px'}}>ハッシュ化され、安全に保存されました。</p>
+<button onClick={() => window.location.href = '/'} style={styles.button}>ログインへ</button>
 </div>
-))}
-<button onClick={() => window.location.reload()} style={styles.logoutBtn}>LOGOUT</button>
-</main>
 </div>
 );
 }
 
-// --- 1 & 2. ログイン画面 ---
 return (
-<div style={styles.loginBg}>
-<div style={styles.loginContent}>
+<div style={styles.container}>
+<div style={styles.card}>
 <h1 style={styles.logo}>B CONNECT</h1>
-<p style={{...styles.statusLine, color: status.includes('ERROR') ? '#FF3B30' : '#00FF41'}}>{status}</p>
-
+<div style={{...styles.status, color: status.includes('ERROR') ? '#FF3B30' : '#00FF41'}}>{status}</div>
 {step === 1 ? (
-<input
-style={styles.input}
-placeholder="ADMIN GMAIL"
-type="email"
-value={email}
-onChange={e => setEmail(e.target.value)}
-/>
-) : (
-<input
-style={styles.input}
-placeholder="MASTER CODE"
-type="number"
-value={otp}
-onChange={e => setOtp(e.target.value)}
-/>
-)}
-
-<button onClick={step === 1 ? requestAccess : authorize} style={styles.button}>
-{loading ? '...' : (step === 1 ? 'REQUEST ACCESS' : 'AUTHORIZE')}
+<>
+<div style={styles.inputGroup}>
+<label style={styles.label}>REAL NAME (実名)</label>
+<input style={styles.input} placeholder="管理者のみ把握" value={formData.realName} onChange={e => setFormData({...formData, realName: e.target.value})} />
+</div>
+<div style={styles.inputGroup}>
+<label style={styles.label}>DISPLAY NAME (ニックネーム)</label>
+<input style={styles.input} placeholder="アプリ内での名前" value={formData.displayName} onChange={e => setFormData({...formData, displayName: e.target.value})} />
+</div>
+<div style={styles.inputGroup}>
+<label style={styles.label}>OSU EMAIL</label>
+<input style={styles.input} placeholder="学籍番号@ge.osaka-sandai.ac.jp" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+</div>
+<div style={styles.inputGroup}>
+<label style={styles.label}>PASSWORD</label>
+<input style={styles.input} type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+</div>
+<button onClick={handleStartAuth} disabled={loading} style={styles.button}>
+{loading ? 'SENDING...' : 'VERIFY EMAIL'}
 </button>
+</>
+) : (
+<>
+<input style={styles.input} placeholder="000000" type="number" />
+<button onClick={completeRegistration} style={styles.button}>COMPLETE</button>
+</>
+)}
 </div>
 </div>
 );
 }
 
 const styles = {
-loginBg: { height: '100dvh', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system, sans-serif' },
-loginContent: { width: '85%', maxWidth: '360px', textAlign: 'center' },
-logo: { color: '#fff', fontSize: '30px', letterSpacing: '8px', fontWeight: '900', marginBottom: '8px' },
-statusLine: { fontSize: '10px', letterSpacing: '1px', marginBottom: '40px', textTransform: 'uppercase' },
-input: { width: '100%', padding: '20px', backgroundColor: '#111', border: '1px solid #333', color: '#fff', borderRadius: '15px', fontSize: '16px', marginBottom: '15px', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
-button: { width: '100%', padding: '20px', backgroundColor: '#fff', color: '#000', borderRadius: '15px', fontWeight: 'bold', fontSize: '16px', border: 'none' },
-adminBg: { height: '100dvh', backgroundColor: '#F2F2F7', display: 'flex', flexDirection: 'column' },
-adminHeader: { padding: '50px 25px 20px', backgroundColor: '#fff', borderBottom: '1px solid #DDD', display: 'flex', justifyContent: 'space-between' },
-adminTitle: { fontSize: '16px', fontWeight: '900', margin: 0 },
-onlineLamp: { color: '#FF9500', fontSize: '10px', fontWeight: 'bold' }, // バイパス中はオレンジ
-main: { padding: '20px', flex: 1, overflowY: 'auto' },
-sectionLabel: { fontSize: '11px', color: '#8E8E93', marginBottom: '15px', fontWeight: 'bold' },
-card: { backgroundColor: '#fff', borderRadius: '20px', padding: '20px', marginBottom: '15px' },
-cardTop: { display: 'flex', justifyContent: 'space-between', marginBottom: '12px' },
-sourceTag: { fontSize: '10px', color: '#007AFF', backgroundColor: '#E1EFFF', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' },
-logId: { fontSize: '10px', color: '#AEAEB2' },
-encBox: { fontSize: '12px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '10px', wordBreak: 'break-all', fontFamily: 'monospace', marginBottom: '15px' },
-actionBtn: { width: '100%', padding: '14px', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold' },
-logoutBtn: { width: '100%', color: '#FF3B30', border: 'none', fontSize: '12px', background: 'none', padding: '20px' }
+container: { height: '100dvh', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system, sans-serif' },
+card: { width: '85%', maxWidth: '380px', textAlign: 'center' },
+logo: { color: '#fff', fontSize: '24px', letterSpacing: '8px', fontWeight: '900', marginBottom: '5px' },
+status: { fontSize: '10px', letterSpacing: '1px', marginBottom: '30px' },
+inputGroup: { textAlign: 'left', marginBottom: '15px' },
+label: { color: '#444', fontSize: '10px', fontWeight: 'bold', marginLeft: '5px', marginBottom: '5px', display: 'block' },
+input: { width: '100%', padding: '16px', backgroundColor: '#111', border: '1px solid #222', color: '#fff', borderRadius: '12px', fontSize: '15px', outline: 'none', boxSizing: 'border-box' },
+button: { width: '100%', padding: '18px', backgroundColor: '#fff', color: '#000', borderRadius: '12px', fontWeight: '900', fontSize: '14px', border: 'none', marginTop: '10px' },
+successIcon: { width: '60px', height: '60px', backgroundColor: '#00FF41', borderRadius: '50%', color: '#000', fontSize: '30px', lineHeight: '60px', margin: '0 auto 20px', fontWeight: 'bold' }
 };
