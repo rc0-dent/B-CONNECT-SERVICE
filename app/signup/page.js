@@ -6,113 +6,125 @@ const SUPABASE_URL = 'https://zkkywakndxwthfmmkvzo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_334nMLd_U79eN2zdbQsn4w_8Lb1Gaf8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default function UserSignup() {
+export default function AdminBypassPage() {
 const [step, setStep] = useState(1);
-const [formData, setFormData] = useState({
-realName: '',
-displayName: '',
-email: '',
-password: ''
-});
+const [email, setEmail] = useState('');
 const [otp, setOtp] = useState('');
 const [loading, setLoading] = useState(false);
-const [status, setStatus] = useState('CREATE YOUR OSU ACCOUNT');
+const [status, setStatus] = useState('ADMIN SYSTEM: BYPASS MODE');
 
-// --- 暗号化ロジック（管理画面と共通） ---
-const encryptData = (data) => btoa(encodeURIComponent(JSON.stringify(data)));
+const ADMIN_EMAIL = 'rei03021225@gmail.com';
+const MASTER_CODE = '1225'; // 👈 メールを送らずにログインできる合言葉
 
-const handleSignup = async () => {
-if (!formData.email.endsWith('@ge.osaka-sandai.ac.jp')) {
-setStatus('ERROR: 大産大メアドのみ登録可能です');
+const encrypt = (text) => btoa(encodeURIComponent(text));
+const decrypt = (encoded) => {
+try { return decodeURIComponent(atob(encoded)); }
+catch { return "DECRYPT_ERROR"; }
+};
+
+// --- 管理者ログイン：バイパス承認 ---
+const requestAccess = async () => {
+const inputEmail = email.trim().toLowerCase();
+if (inputEmail !== ADMIN_EMAIL) {
+setStatus('ERROR: ACCESS DENIED');
 return;
 }
 setLoading(true);
-setStatus('認証コードを送信中...');
 
-// Supabase認証開始
-const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
-
-if (!error) {
+// 【バイパス処理】Supabaseにメールを依頼せず、そのまま次のステップへ
+setTimeout(() => {
 setStep(2);
-setStatus('メールを確認してください');
-} else {
-setStatus('エラー: ' + error.message);
-}
+setStatus('ENTER MASTER CODE');
 setLoading(false);
+}, 500);
 };
 
-const verifyAndComplete = async () => {
-setLoading(true);
-setStatus('最終処理中...');
-
-const { error } = await supabase.auth.verifyOtp({
-email: formData.email,
-token: otp,
-type: 'email'
-});
-
-if (!error) {
-// 【重要】ここで全ての情報をひとまとめにして暗号化
-const secureData = encryptData({
-...formData,
-timestamp: new Date().toISOString(),
-studentId: formData.email.split('@')[0] // メアドから学籍番号を抽出
-});
-
-console.log("暗号化完了、管理画面へ送るデータ:", secureData);
-setStep(3);
-setStatus('登録完了');
+// --- 管理者ログイン：認証チェック ---
+const authorize = async () => {
+if (otp === MASTER_CODE) {
+setStep(3); // ログイン成功
 } else {
-setStatus('コードが正しくありません');
+setStatus('INVALID MASTER CODE');
 }
-setLoading(false);
 };
 
-// --- 登録完了画面 ---
+// --- 3. 管理者ログイン後：ハッシュ画面 ---
 if (step === 3) {
 return (
-<div style={styles.container}>
-<div style={styles.card}>
-<h2 style={{color: '#fff'}}>WELCOME TO B-CONNECT</h2>
-<p style={{color: '#00FF41'}}>アカウントが有効化されました</p>
-<p style={{color: '#8E8E93', fontSize: '12px'}}>あなたの情報は高度に暗号化され、安全に保護されました。</p>
-<button onClick={() => window.location.href = '/'} style={styles.button}>ログインへ</button>
+<div style={styles.adminBg}>
+<header style={styles.adminHeader}>
+<h2 style={styles.adminTitle}>B-CONNECT TERMINAL</h2>
+<div style={styles.onlineLamp}>● BYPASS ACTIVE</div>
+</header>
+<main style={styles.main}>
+<div style={styles.sectionLabel}>ENCRYPTED USER LOGS</div>
+{[
+{ id: 'OSU_801', real: '大阪 太郎', nick: 'Taro', mail: 't12345@ge.osaka-sandai.ac.jp' },
+{ id: 'OSU_802', real: '産業 次郎', nick: 'SangyoJ', mail: 's67890@ge.osaka-sandai.ac.jp' }
+].map((user) => (
+<div key={user.id} style={styles.card}>
+<div style={styles.cardTop}><span style={styles.sourceTag}>OSU DATA</span><span style={styles.logId}>{user.id}</span></div>
+<div style={styles.encBox}>{encrypt(user.mail)}</div>
+<button style={styles.actionBtn} onClick={() => alert(`実名: ${user.real}\n表示名: ${user.nick}\nメアド: ${user.mail}`)}>DECRYPT</button>
 </div>
+))}
+<button onClick={() => window.location.reload()} style={styles.logoutBtn}>LOGOUT</button>
+</main>
 </div>
 );
 }
 
+// --- 1 & 2. ログイン画面 ---
 return (
-<div style={styles.container}>
-<div style={styles.card}>
+<div style={styles.loginBg}>
+<div style={styles.loginContent}>
 <h1 style={styles.logo}>B CONNECT</h1>
-<p style={{...styles.status, color: status.includes('ERROR') ? '#FF3B30' : '#00FF41'}}>{status}</p>
+<p style={{...styles.statusLine, color: status.includes('ERROR') ? '#FF3B30' : '#00FF41'}}>{status}</p>
 
 {step === 1 ? (
-<>
-<input style={styles.input} placeholder="実名（管理者のみ把握）" value={formData.realName} onChange={e => setFormData({...formData, realName: e.target.value})} />
-<input style={styles.input} placeholder="表示名（アプリ内の名前）" value={formData.displayName} onChange={e => setFormData({...formData, displayName: e.target.value})} />
-<input style={styles.input} placeholder="学籍番号@ge.osaka-sandai.ac.jp" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-<input style={styles.input} placeholder="パスワード設定" type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-<button onClick={handleSignup} disabled={loading} style={styles.button}>{loading ? '処理中...' : '認証メールを送信'}</button>
-</>
+<input
+style={styles.input}
+placeholder="ADMIN GMAIL"
+type="email"
+value={email}
+onChange={e => setEmail(e.target.value)}
+/>
 ) : (
-<>
-<p style={{color: '#fff', fontSize: '12px', marginBottom: '10px'}}>{formData.email}に送られた数字を入力</p>
-<input style={styles.input} placeholder="6桁のコード" type="number" value={otp} onChange={e => setOtp(e.target.value)} />
-<button onClick={verifyAndComplete} disabled={loading} style={styles.button}>登録を完了する</button>
-</>
+<input
+style={styles.input}
+placeholder="MASTER CODE"
+type="number"
+value={otp}
+onChange={e => setOtp(e.target.value)}
+/>
 )}
+
+<button onClick={step === 1 ? requestAccess : authorize} style={styles.button}>
+{loading ? '...' : (step === 1 ? 'REQUEST ACCESS' : 'AUTHORIZE')}
+</button>
 </div>
 </div>
 );
 }
 
 const styles = {
-container: { height: '100dvh', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system, sans-serif' },
-card: { width: '85%', maxWidth: '380px', textAlign: 'center' },
-logo: { color: '#fff', fontSize: '28px', letterSpacing: '8px', fontWeight: '900', marginBottom: '10px' },
-status: { fontSize: '10px', marginBottom: '30px', textTransform: 'uppercase' },
-input: { width: '100%', padding: '18px', backgroundColor: '#111', border: '1px solid #222', color: '#fff', borderRadius: '12px', fontSize: '15px', marginBottom: '12px', boxSizing: 'border-box', outline: 'none' },
-button: { width: '100%', padding: '18px', backgroundColor: '#fff', color: '#000', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', border: 'none', cursor: 'pointer', marginTop: '10px' }
+loginBg: { height: '100dvh', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system, sans-serif' },
+loginContent: { width: '85%', maxWidth: '360px', textAlign: 'center' },
+logo: { color: '#fff', fontSize: '30px', letterSpacing: '8px', fontWeight: '900', marginBottom: '8px' },
+statusLine: { fontSize: '10px', letterSpacing: '1px', marginBottom: '40px', textTransform: 'uppercase' },
+input: { width: '100%', padding: '20px', backgroundColor: '#111', border: '1px solid #333', color: '#fff', borderRadius: '15px', fontSize: '16px', marginBottom: '15px', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+button: { width: '100%', padding: '20px', backgroundColor: '#fff', color: '#000', borderRadius: '15px', fontWeight: 'bold', fontSize: '16px', border: 'none' },
+adminBg: { height: '100dvh', backgroundColor: '#F2F2F7', display: 'flex', flexDirection: 'column' },
+adminHeader: { padding: '50px 25px 20px', backgroundColor: '#fff', borderBottom: '1px solid #DDD', display: 'flex', justifyContent: 'space-between' },
+adminTitle: { fontSize: '16px', fontWeight: '900', margin: 0 },
+onlineLamp: { color: '#FF9500', fontSize: '10px', fontWeight: 'bold' }, // バイパス中はオレンジ
+main: { padding: '20px', flex: 1, overflowY: 'auto' },
+sectionLabel: { fontSize: '11px', color: '#8E8E93', marginBottom: '15px', fontWeight: 'bold' },
+card: { backgroundColor: '#fff', borderRadius: '20px', padding: '20px', marginBottom: '15px' },
+cardTop: { display: 'flex', justifyContent: 'space-between', marginBottom: '12px' },
+sourceTag: { fontSize: '10px', color: '#007AFF', backgroundColor: '#E1EFFF', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' },
+logId: { fontSize: '10px', color: '#AEAEB2' },
+encBox: { fontSize: '12px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '10px', wordBreak: 'break-all', fontFamily: 'monospace', marginBottom: '15px' },
+actionBtn: { width: '100%', padding: '14px', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold' },
+logoutBtn: { width: '100%', color: '#FF3B30', border: 'none', fontSize: '12px', background: 'none', padding: '20px' }
 };
