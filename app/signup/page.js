@@ -23,17 +23,18 @@ const OSU_DOMAIN = '@ge.osaka-sandai.ac.jp';
 const encryptData = (data) => btoa(encodeURIComponent(JSON.stringify(data)));
 
 const handleStartAuth = async () => {
-if (!formData.realName || !formData.displayName || !formData.password) {
+if (!formData.realName || !formData.displayName || !formData.password || !formData.email) {
 setStatus('ERROR: 全て入力してください');
 return;
 }
 if (!formData.email.endsWith(OSU_DOMAIN)) {
-setStatus('ERROR: 大産大メアドが必要です');
+setStatus('ERROR: 大産大メアド以外は登録できません');
 return;
 }
 
 setLoading(true);
 setStatus('認証コード送信中...');
+
 const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
 
 if (!error) {
@@ -46,12 +47,21 @@ setLoading(false);
 };
 
 const completeRegistration = () => {
+// 【ここがポイント！】
+const fullEmail = formData.email; // メアド全文をそのまま保持
+const studentId = fullEmail.split('@')[0]; // @の前だけを抽出
+
+// 送信データパッケージ：メアドも学籍番号も両方入れる！
 const securePacket = encryptData({
-...formData,
-studentId: formData.email.split('@')[0],
+realName: formData.realName,
+displayName: formData.displayName,
+email: fullEmail, // 👈 これでメアド全文を保存
+studentId: studentId, // 👈 これで学籍番号だけも保存
+password: formData.password,
 createdAt: new Date().toISOString()
 });
-console.log("暗号化データ作成完了:", securePacket);
+
+console.log("管理者へのデータ内容:", { fullEmail, studentId });
 setStep(3);
 };
 
@@ -61,8 +71,11 @@ return (
 <div style={styles.card}>
 <div style={styles.successIcon}>✓</div>
 <h2 style={{color: '#fff', marginBottom: '10px'}}>REGISTERED</h2>
-<p style={{color: '#8E8E93', fontSize: '13px'}}>ハッシュ化され、安全に保存されました。</p>
-<button onClick={() => window.location.href = '/'} style={styles.button}>ログインへ</button>
+<p style={{color: '#8E8E93', fontSize: '13px'}}>
+登録完了！<br/>
+メアド全文と学籍番号の両方が保存されました。
+</p>
+<button onClick={() => window.location.href = '/'} style={styles.button}>戻る</button>
 </div>
 </div>
 );
@@ -73,18 +86,19 @@ return (
 <div style={styles.card}>
 <h1 style={styles.logo}>B CONNECT</h1>
 <div style={{...styles.status, color: status.includes('ERROR') ? '#FF3B30' : '#00FF41'}}>{status}</div>
+
 {step === 1 ? (
 <>
 <div style={styles.inputGroup}>
 <label style={styles.label}>REAL NAME (実名)</label>
-<input style={styles.input} placeholder="管理者のみ把握" value={formData.realName} onChange={e => setFormData({...formData, realName: e.target.value})} />
+<input style={styles.input} placeholder="例: 大阪 太郎" value={formData.realName} onChange={e => setFormData({...formData, realName: e.target.value})} />
 </div>
 <div style={styles.inputGroup}>
 <label style={styles.label}>DISPLAY NAME (ニックネーム)</label>
-<input style={styles.input} placeholder="アプリ内での名前" value={formData.displayName} onChange={e => setFormData({...formData, displayName: e.target.value})} />
+<input style={styles.input} placeholder="アプリ内での表示名" value={formData.displayName} onChange={e => setFormData({...formData, displayName: e.target.value})} />
 </div>
 <div style={styles.inputGroup}>
-<label style={styles.label}>OSU EMAIL</label>
+<label style={styles.label}>OSU EMAIL (大学用メアド)</label>
 <input style={styles.input} placeholder="学籍番号@ge.osaka-sandai.ac.jp" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
 </div>
 <div style={styles.inputGroup}>
@@ -92,11 +106,14 @@ return (
 <input style={styles.input} type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
 </div>
 <button onClick={handleStartAuth} disabled={loading} style={styles.button}>
-{loading ? 'SENDING...' : 'VERIFY EMAIL'}
+{loading ? 'SENDING...' : 'VERIFY UNIVERSITY EMAIL'}
 </button>
 </>
 ) : (
 <>
+<p style={{color: '#8E8E93', fontSize: '12px', marginBottom: '20px'}}>
+{formData.email} 宛に届いたコードを入力
+</p>
 <input style={styles.input} placeholder="000000" type="number" />
 <button onClick={completeRegistration} style={styles.button}>COMPLETE</button>
 </>
